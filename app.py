@@ -27,6 +27,21 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 st.cache_data.clear()
 
 
+def hide_streamlit_style():
+    """Streamlitの標準ヘッダーを非表示"""
+    hide_st_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header[data-testid="stHeader"] {visibility: hidden;}
+    .stDeployButton {display: none;}
+    .stToolbar {display: none;}
+    .stDecoration {display: none;}
+    </style>
+    """
+    st.markdown(hide_st_style, unsafe_allow_html=True)
+
+
 class FortunetellerMapApp:
     """メインアプリケーションクラス - シンプル解決版"""
 
@@ -473,6 +488,8 @@ class FortunetellerMapApp:
         try:
             # ページ設定
             UIManager.setup_page_config()
+            # ヘッダー非表示（新規追加）
+            hide_streamlit_style()
             UIManager.show_header()
 
             # 画面遷移処理
