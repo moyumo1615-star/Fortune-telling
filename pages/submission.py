@@ -43,12 +43,21 @@ class SubmissionForm:
             st.session_state.auto_address = ""
 
     def _show_simple_map(self):
-        """シンプルな地図表示（位置情報取得ボタン付き）"""
-        # 位置情報取得ボタンを最初に配置
-        col1, col2, col3 = st.columns([2, 1, 2])
-        with col2:
-            if st.button("📍 位置情報を取得", key="get_location_simple", type="primary"):
+        """シンプルな地図表示（スマホ対応版）"""
+        # デバイス判定
+        device_type = st.session_state.get('device_type', 'desktop')
+
+        # ★★★ 位置情報取得ボタンをスマホ対応で配置 ★★★
+        if device_type == 'mobile':
+            # スマホでは列を使わず、フル幅で表示
+            if st.button("📍 位置情報を取得", key="get_location_simple", type="primary", use_container_width=True):
                 self._get_current_location()
+        else:
+            # PC・タブレットでは中央配置
+            col1, col2, col3 = st.columns([2, 1, 2])
+            with col2:
+                if st.button("📍 位置情報を取得", key="get_location_simple", type="primary"):
+                    self._get_current_location()
 
         st.info("📍 地図をクリックして占い師の位置を指定してください")
 
@@ -97,11 +106,12 @@ class SubmissionForm:
                 )
             ).add_to(submission_map)
 
-        # 地図表示
+        # 地図表示（スマホ対応の高さ調整）
+        map_height = 300 if device_type == 'mobile' else 400
         map_data = st_folium(
             submission_map,
             width=None,
-            height=400,
+            height=map_height,
             returned_objects=["last_clicked"],
             key="submission_map_simple"
         )
@@ -112,60 +122,88 @@ class SubmissionForm:
         # 位置情報の表示
         self._show_location_status(has_location)
 
-        # リセットボタン
+        # リセットボタン（スマホ対応）
         if has_location:
-            col1, col2, col3 = st.columns([2, 1, 2])
-            with col2:
-                if st.button("🔄 位置をリセット", type="secondary"):
-                    st.session_state.submission_click_lat = None
-                    st.session_state.submission_click_lng = None
-                    st.session_state.auto_address = ""
-                    st.success("✅ 位置をリセットしました")
-                    st.rerun()
+            if device_type == 'mobile':
+                # スマホではフル幅のボタン
+                if st.button("🔄 位置をリセット", type="secondary", use_container_width=True):
+                    self._reset_location()
+            else:
+                # PC・タブレットでは中央配置
+                col1, col2, col3 = st.columns([2, 1, 2])
+                with col2:
+                    if st.button("🔄 位置をリセット", type="secondary"):
+                        self._reset_location()
+
+    def _reset_location(self):
+        """位置情報のリセット"""
+        st.session_state.submission_click_lat = None
+        st.session_state.submission_click_lng = None
+        st.session_state.auto_address = ""
+        st.success("✅ 位置をリセットしました")
+        st.rerun()
 
     def _get_current_location(self):
-        """位置情報取得処理"""
-        st.info("位置情報を取得中...")
+        """位置情報取得処理（改良版）"""
+        st.info("📍 位置情報を取得中...")
 
-        # JavaScript で位置情報を取得
+        # より強化されたJavaScriptコード
         st.markdown("""
         <script>
-        if (navigator.geolocation) {
+        function getCurrentLocationForSubmission() {
+            if (!navigator.geolocation) {
+                alert('このブラウザは位置情報に対応していません');
+                return;
+            }
+            
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 300000
+            };
+            
             navigator.geolocation.getCurrentPosition(
                 function(position) {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
+                    const accuracy = Math.round(position.coords.accuracy);
                     
-                    // 成功メッセージを表示（簡易的）
-                    alert('位置情報を取得しました: ' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '\n地図上でクリックして微調整できます');
+                    // 成功メッセージを表示
+                    const message = `位置情報を取得しました！\n緯度: ${lat.toFixed(6)}\n経度: ${lng.toFixed(6)}\n精度: 約${accuracy}m\n\n地図上でクリックして微調整できます。`;
+                    alert(message);
+                    
+                    // 位置情報をStreamlitに送信
+                    window.parent.postMessage({
+                        type: 'geolocation_success',
+                        latitude: lat,
+                        longitude: lng,
+                        accuracy: accuracy
+                    }, '*');
                 },
                 function(error) {
-                    let message = '位置情報の取得に失敗しました: ';
+                    let message = '位置情報の取得に失敗しました:\n';
                     switch(error.code) {
                         case error.PERMISSION_DENIED:
-                            message += '位置情報の使用が拒否されました';
+                            message += '位置情報の使用が拒否されました。\nブラウザの設定で許可してください。';
                             break;
                         case error.POSITION_UNAVAILABLE:
-                            message += '位置情報を取得できませんでした';
+                            message += '位置情報を取得できませんでした。\nGPSやWi-Fiの接続を確認してください。';
                             break;
                         case error.TIMEOUT:
-                            message += '位置情報の取得がタイムアウトしました';
+                            message += '位置情報の取得がタイムアウトしました。\n再度お試しください。';
                             break;
                         default:
-                            message += '不明なエラーが発生しました';
+                            message += '不明なエラーが発生しました。';
                             break;
                     }
                     alert(message);
                 },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 600000
-                }
+                options
             );
-        } else {
-            alert('このブラウザは位置情報に対応していません');
         }
+        
+        // 即座に実行
+        getCurrentLocationForSubmission();
         </script>
         """, unsafe_allow_html=True)
 
@@ -198,32 +236,50 @@ class SubmissionForm:
         if has_location:
             st.success(
                 f"📍 選択済み位置: 緯度 {st.session_state.submission_click_lat:.6f}, 経度 {st.session_state.submission_click_lng:.6f}")
+
+            # スマホ用の追加説明
+            device_type = st.session_state.get('device_type', 'desktop')
+            if device_type == 'mobile':
+                st.info("💡 地図をタップして位置を微調整できます")
         else:
             st.warning("⚠️ 地図をクリックまたは位置情報を取得して位置を指定してください")
 
     def _show_form_section(self):
-        """フォームセクション表示"""
+        """フォームセクション表示（スマホ対応改良版）"""
         has_location = (st.session_state.submission_click_lat is not None and
                         st.session_state.submission_click_lng is not None)
+
+        device_type = st.session_state.get('device_type', 'desktop')
 
         with st.form("submission_form"):
             st.markdown("### 📝 占い師情報を入力してください")
 
-            # 基本情報
-            col1, col2 = st.columns(2)
-
-            with col1:
+            # 基本情報（スマホ対応レイアウト）
+            if device_type == 'mobile':
+                # モバイルでは縦並び
                 name = st.text_input("占い師名 *", placeholder="例：渋谷占い館")
                 category = st.selectbox("占いの種類", config.FORTUNE_CATEGORIES)
                 contact = st.text_input("電話番号", placeholder="例：03-1234-5678")
-
-            with col2:
                 website = st.text_input(
                     "ウェブサイト", placeholder="例：https://example.com")
                 submitted_by = st.text_input("投稿者名", placeholder="匿名可")
+            else:
+                # PC・タブレットでは横並び
+                col1, col2 = st.columns(2)
 
-            # 住所情報
-            zipcode, address = self._show_address_section()
+                with col1:
+                    name = st.text_input("占い師名 *", placeholder="例：渋谷占い館")
+                    category = st.selectbox("占いの種類", config.FORTUNE_CATEGORIES)
+                    contact = st.text_input(
+                        "電話番号", placeholder="例：03-1234-5678")
+
+                with col2:
+                    website = st.text_input(
+                        "ウェブサイト", placeholder="例：https://example.com")
+                    submitted_by = st.text_input("投稿者名", placeholder="匿名可")
+
+            # 住所情報（スマホ対応）
+            zipcode, address = self._show_address_section(device_type)
 
             # 詳細説明
             description = st.text_area(
@@ -252,24 +308,37 @@ class SubmissionForm:
                     description, zipcode, address, has_location
                 )
 
-    def _show_address_section(self):
-        """住所入力セクション"""
+    def _show_address_section(self, device_type):
+        """住所入力セクション（スマホ対応）"""
         st.markdown("#### 📍 住所情報（任意）")
 
-        address_col1, address_col2 = st.columns([2, 3])
-
-        with address_col1:
+        if device_type == 'mobile':
+            # モバイルでは縦並び
             zipcode = st.text_input(
                 "郵便番号",
                 placeholder="例：1000001 または 100-0001"
             )
-
-        with address_col2:
             address = st.text_input(
                 "住所",
                 value=st.session_state.auto_address,
                 placeholder="例：東京都渋谷区神宮前1-1-1"
             )
+        else:
+            # PC・タブレットでは横並び
+            address_col1, address_col2 = st.columns([2, 3])
+
+            with address_col1:
+                zipcode = st.text_input(
+                    "郵便番号",
+                    placeholder="例：1000001 または 100-0001"
+                )
+
+            with address_col2:
+                address = st.text_input(
+                    "住所",
+                    value=st.session_state.auto_address,
+                    placeholder="例：東京都渋谷区神宮前1-1-1"
+                )
 
         # 郵便番号検索ボタン
         if st.form_submit_button("📮 郵便番号から住所を取得", type="secondary"):
