@@ -352,40 +352,10 @@ class FortunetellerMapApp:
                 border-color: {config.PRIMARY_COLOR} !important;
                 color: white !important;
             }}
-            
-            /* アクションセクション特別指定 */
-            .action-button {{
-                background: linear-gradient(45deg, {config.PRIMARY_COLOR}, #a855f7) !important;
-                color: white !important;
-                border: none !important;
-                border-radius: 10px !important;
-                padding: 12px 16px !important;
-                font-weight: 600 !important;
-                font-size: 16px !important;
-                cursor: pointer !important;
-                transition: all 0.3s ease !important;
-                width: 100% !important;
-                margin: 8px 0 !important;
-            }}
-            
-            .action-button:hover {{
-                background: linear-gradient(45deg, #6a3d7a, #7c3aed) !important;
-                box-shadow: 0 6px 12px rgba(139, 79, 159, 0.4) !important;
-                transform: translateY(-2px) !important;
-            }}
             </style>
             """, unsafe_allow_html=True)
 
-            # 占い師登録ボタン（HTMLで直接指定）
-            st.markdown(f"""
-            <div style="margin: 12px 0;">
-                <button class="action-button" onclick="document.querySelector('[key=sidebar_submit_app]').click()">
-                    🔮 占い師登録
-                </button>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # 実際の機能ボタン（非表示）
+            # 占い師登録ボタン（実際に機能するStreamlitボタンのみ）
             if st.button(
                 "🔮 占い師登録",
                 type="primary",
@@ -400,16 +370,7 @@ class FortunetellerMapApp:
                 st.session_state.show_submission_form = True
                 st.rerun()
 
-            # お仕事依頼ボタン（HTMLで直接指定）
-            st.markdown(f"""
-            <div style="margin: 12px 0;">
-                <button class="action-button" onclick="document.querySelector('[key=sidebar_work_app]').click()">
-                    💼 お仕事のご依頼
-                </button>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # 実際の機能ボタン（非表示）
+            # お仕事依頼ボタン（実際に機能するStreamlitボタンのみ）
             if st.button(
                 "💼 お仕事のご依頼",
                 key="sidebar_work_app",
