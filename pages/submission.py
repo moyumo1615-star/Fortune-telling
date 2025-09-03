@@ -1,5 +1,5 @@
 """
-占い師投稿フォーム（シンプル現在地対応版）
+占い師投稿フォーム（デスクトップ固定版）
 新規占い師情報の投稿を管理
 """
 import streamlit as st
@@ -11,23 +11,23 @@ import re
 
 
 class SubmissionForm:
-    """投稿フォームクラス（シンプル現在地対応版）"""
+    """投稿フォームクラス（デスクトップ固定版）"""
 
     def __init__(self, db):
         self.db = db
 
     def show(self):
-        """投稿フォーム表示（シンプル版）"""
+        """投稿フォーム表示（デスクトップ固定版）"""
         st.markdown("---")
         st.subheader("🔮 新規占い師を登録")
 
         # セッション状態の初期化
         self._init_session_state()
 
-        # 地図表示（位置情報取得ボタン付き）
-        self._show_simple_map()
+        # 地図表示（デスクトップ固定）
+        self._show_map()
 
-        # フォームセクション
+        # フォームセクション（デスクトップ固定）
         self._show_form_section()
 
         # 閉じるボタン
@@ -42,22 +42,13 @@ class SubmissionForm:
         if 'auto_address' not in st.session_state:
             st.session_state.auto_address = ""
 
-    def _show_simple_map(self):
-        """シンプルな地図表示（スマホ対応版）"""
-        # デバイス判定
-        device_type = st.session_state.get('device_type', 'desktop')
-
-        # ★★★ 位置情報取得ボタンをスマホ対応で配置 ★★★
-        if device_type == 'mobile':
-            # スマホでは列を使わず、フル幅で表示
-            if st.button("📍 位置情報を取得", key="get_location_simple", type="primary", use_container_width=True):
+    def _show_map(self):
+        """地図表示（デスクトップ固定版）"""
+        # ★★★ 位置情報取得ボタン（デスクトップ固定） ★★★
+        col1, col2, col3 = st.columns([2, 1, 2])
+        with col2:
+            if st.button("📍 位置情報を取得", key="get_location_desktop", type="primary"):
                 self._get_current_location()
-        else:
-            # PC・タブレットでは中央配置
-            col1, col2, col3 = st.columns([2, 1, 2])
-            with col2:
-                if st.button("📍 位置情報を取得", key="get_location_simple", type="primary"):
-                    self._get_current_location()
 
         st.info("📍 地図をクリックして占い師の位置を指定してください")
 
@@ -106,14 +97,13 @@ class SubmissionForm:
                 )
             ).add_to(submission_map)
 
-        # 地図表示（スマホ対応の高さ調整）
-        map_height = 300 if device_type == 'mobile' else 400
+        # 地図表示（デスクトップサイズ固定）
         map_data = st_folium(
             submission_map,
             width=None,
-            height=map_height,
+            height=400,  # デスクトップサイズ固定
             returned_objects=["last_clicked"],
-            key="submission_map_simple"
+            key="submission_map_desktop"
         )
 
         # 地図クリック処理
@@ -122,18 +112,12 @@ class SubmissionForm:
         # 位置情報の表示
         self._show_location_status(has_location)
 
-        # リセットボタン（スマホ対応）
+        # リセットボタン（デスクトップ固定）
         if has_location:
-            if device_type == 'mobile':
-                # スマホではフル幅のボタン
-                if st.button("🔄 位置をリセット", type="secondary", use_container_width=True):
+            col1, col2, col3 = st.columns([2, 1, 2])
+            with col2:
+                if st.button("🔄 位置をリセット", type="secondary"):
                     self._reset_location()
-            else:
-                # PC・タブレットでは中央配置
-                col1, col2, col3 = st.columns([2, 1, 2])
-                with col2:
-                    if st.button("🔄 位置をリセット", type="secondary"):
-                        self._reset_location()
 
     def _reset_location(self):
         """位置情報のリセット"""
@@ -236,50 +220,32 @@ class SubmissionForm:
         if has_location:
             st.success(
                 f"📍 選択済み位置: 緯度 {st.session_state.submission_click_lat:.6f}, 経度 {st.session_state.submission_click_lng:.6f}")
-
-            # スマホ用の追加説明
-            device_type = st.session_state.get('device_type', 'desktop')
-            if device_type == 'mobile':
-                st.info("💡 地図をタップして位置を微調整できます")
         else:
             st.warning("⚠️ 地図をクリックまたは位置情報を取得して位置を指定してください")
 
     def _show_form_section(self):
-        """フォームセクション表示（スマホ対応改良版）"""
+        """フォームセクション表示（デスクトップ固定版）"""
         has_location = (st.session_state.submission_click_lat is not None and
                         st.session_state.submission_click_lng is not None)
-
-        device_type = st.session_state.get('device_type', 'desktop')
 
         with st.form("submission_form"):
             st.markdown("### 📝 占い師情報を入力してください")
 
-            # 基本情報（スマホ対応レイアウト）
-            if device_type == 'mobile':
-                # モバイルでは縦並び
+            # 基本情報（デスクトップレイアウト）
+            col1, col2 = st.columns(2)
+
+            with col1:
                 name = st.text_input("占い師名 *", placeholder="例：渋谷占い館")
                 category = st.selectbox("占いの種類", config.FORTUNE_CATEGORIES)
                 contact = st.text_input("電話番号", placeholder="例：03-1234-5678")
+
+            with col2:
                 website = st.text_input(
                     "ウェブサイト", placeholder="例：https://example.com")
                 submitted_by = st.text_input("投稿者名", placeholder="匿名可")
-            else:
-                # PC・タブレットでは横並び
-                col1, col2 = st.columns(2)
 
-                with col1:
-                    name = st.text_input("占い師名 *", placeholder="例：渋谷占い館")
-                    category = st.selectbox("占いの種類", config.FORTUNE_CATEGORIES)
-                    contact = st.text_input(
-                        "電話番号", placeholder="例：03-1234-5678")
-
-                with col2:
-                    website = st.text_input(
-                        "ウェブサイト", placeholder="例：https://example.com")
-                    submitted_by = st.text_input("投稿者名", placeholder="匿名可")
-
-            # 住所情報（スマホ対応）
-            zipcode, address = self._show_address_section(device_type)
+            # 住所情報（デスクトップレイアウト）
+            zipcode, address = self._show_address_section()
 
             # 詳細説明
             description = st.text_area(
@@ -308,37 +274,24 @@ class SubmissionForm:
                     description, zipcode, address, has_location
                 )
 
-    def _show_address_section(self, device_type):
-        """住所入力セクション（スマホ対応）"""
+    def _show_address_section(self):
+        """住所入力セクション（デスクトップレイアウト）"""
         st.markdown("#### 📍 住所情報（任意）")
 
-        if device_type == 'mobile':
-            # モバイルでは縦並び
+        address_col1, address_col2 = st.columns([2, 3])
+
+        with address_col1:
             zipcode = st.text_input(
                 "郵便番号",
                 placeholder="例：1000001 または 100-0001"
             )
+
+        with address_col2:
             address = st.text_input(
                 "住所",
                 value=st.session_state.auto_address,
                 placeholder="例：東京都渋谷区神宮前1-1-1"
             )
-        else:
-            # PC・タブレットでは横並び
-            address_col1, address_col2 = st.columns([2, 3])
-
-            with address_col1:
-                zipcode = st.text_input(
-                    "郵便番号",
-                    placeholder="例：1000001 または 100-0001"
-                )
-
-            with address_col2:
-                address = st.text_input(
-                    "住所",
-                    value=st.session_state.auto_address,
-                    placeholder="例：東京都渋谷区神宮前1-1-1"
-                )
 
         # 郵便番号検索ボタン
         if st.form_submit_button("📮 郵便番号から住所を取得", type="secondary"):
