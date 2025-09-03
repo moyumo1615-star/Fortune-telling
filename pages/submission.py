@@ -1,5 +1,5 @@
 """
-占い師投稿フォーム（地図挙動完全修正版）
+占い師投稿フォーム（シンプル現在地対応版）
 新規占い師情報の投稿を管理
 """
 import streamlit as st
@@ -11,23 +11,21 @@ import re
 
 
 class SubmissionForm:
-    """投稿フォームクラス（地図挙動完全修正版）"""
+    """投稿フォームクラス（シンプル現在地対応版）"""
 
     def __init__(self, db):
         self.db = db
 
     def show(self):
-        """投稿フォーム表示（地図挙動完全修正版）"""
+        """投稿フォーム表示（シンプル版）"""
         st.markdown("---")
         st.subheader("🔮 新規占い師を登録")
-
-        st.info("📍 地図をクリックして占い師の位置を指定してください")
 
         # セッション状態の初期化
         self._init_session_state()
 
-        # 地図表示（再描画なし版）
-        self._show_stable_map()
+        # 地図表示（位置情報取得ボタン付き）
+        self._show_simple_map()
 
         # フォームセクション
         self._show_form_section()
@@ -44,25 +42,31 @@ class SubmissionForm:
         if 'auto_address' not in st.session_state:
             st.session_state.auto_address = ""
 
-    def _show_stable_map(self):
-        """安定した地図表示（再描画なし）"""
+    def _show_simple_map(self):
+        """シンプルな地図表示（位置情報取得ボタン付き）"""
+        # 位置情報取得ボタンを最初に配置
+        col1, col2, col3 = st.columns([2, 1, 2])
+        with col2:
+            if st.button("📍 位置情報を取得", key="get_location_simple", type="primary"):
+                self._get_current_location()
+
+        st.info("📍 地図をクリックして占い師の位置を指定してください")
+
         # 現在の選択状態
         has_location = (st.session_state.submission_click_lat is not None and
                         st.session_state.submission_click_lng is not None)
 
         # 地図の中心とズームを決定
         if has_location:
-            # 位置が選択済みの場合は、その位置を中心に詳細表示
             center_lat = st.session_state.submission_click_lat
             center_lng = st.session_state.submission_click_lng
-            zoom_level = 14  # 詳細レベル
+            zoom_level = 14
         else:
-            # 未選択の場合はデフォルト位置
             center_lat = config.DEFAULT_CENTER_LAT
             center_lng = config.DEFAULT_CENTER_LON
-            zoom_level = 10  # 広域表示
+            zoom_level = 10
 
-        # 地図作成（常に新しい地図オブジェクト）
+        # 地図作成
         submission_map = folium.Map(
             location=[center_lat, center_lng],
             zoom_start=zoom_level,
@@ -93,26 +97,80 @@ class SubmissionForm:
                 )
             ).add_to(submission_map)
 
-        # 地図表示（固定キーで安定表示）
+        # 地図表示
         map_data = st_folium(
             submission_map,
             width=None,
             height=400,
             returned_objects=["last_clicked"],
-            key="submission_map_stable"
+            key="submission_map_simple"
         )
 
-        # クリック処理（再描画なし）
+        # 地図クリック処理
         self._process_map_click(map_data, has_location)
 
         # 位置情報の表示
         self._show_location_status(has_location)
 
         # リセットボタン
-        self._show_reset_button()
+        if has_location:
+            col1, col2, col3 = st.columns([2, 1, 2])
+            with col2:
+                if st.button("🔄 位置をリセット", type="secondary"):
+                    st.session_state.submission_click_lat = None
+                    st.session_state.submission_click_lng = None
+                    st.session_state.auto_address = ""
+                    st.success("✅ 位置をリセットしました")
+                    st.rerun()
+
+    def _get_current_location(self):
+        """位置情報取得処理"""
+        st.info("位置情報を取得中...")
+
+        # JavaScript で位置情報を取得
+        st.markdown("""
+        <script>
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    
+                    // 成功メッセージを表示（簡易的）
+                    alert('位置情報を取得しました: ' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '\n地図上でクリックして微調整できます');
+                },
+                function(error) {
+                    let message = '位置情報の取得に失敗しました: ';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            message += '位置情報の使用が拒否されました';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            message += '位置情報を取得できませんでした';
+                            break;
+                        case error.TIMEOUT:
+                            message += '位置情報の取得がタイムアウトしました';
+                            break;
+                        default:
+                            message += '不明なエラーが発生しました';
+                            break;
+                    }
+                    alert(message);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 600000
+                }
+            );
+        } else {
+            alert('このブラウザは位置情報に対応していません');
+        }
+        </script>
+        """, unsafe_allow_html=True)
 
     def _process_map_click(self, map_data, current_has_location):
-        """地図クリック処理（0.5秒後更新版）"""
+        """地図クリック処理"""
         if map_data.get('last_clicked') is not None:
             clicked_lat = map_data['last_clicked']['lat']
             clicked_lng = map_data['last_clicked']['lng']
@@ -130,13 +188,7 @@ class SubmissionForm:
                 st.session_state.submission_click_lat = clicked_lat
                 st.session_state.submission_click_lng = clicked_lng
 
-                # 成功メッセージを設定
-                if 'map_click_message' not in st.session_state:
-                    st.session_state.map_click_message = ""
-
-                st.session_state.map_click_message = f"📍 位置を選択しました: 緯度 {clicked_lat:.6f}, 経度 {clicked_lng:.6f}"
-
-                # 0.5秒待ってから画面更新
+                # 少し待ってから画面更新
                 import time
                 time.sleep(0.5)
                 st.rerun()
@@ -144,30 +196,10 @@ class SubmissionForm:
     def _show_location_status(self, has_location):
         """位置情報ステータス表示"""
         if has_location:
-            # 選択済みの場合
             st.success(
                 f"📍 選択済み位置: 緯度 {st.session_state.submission_click_lat:.6f}, 経度 {st.session_state.submission_click_lng:.6f}")
-
-            # クリックメッセージがある場合は表示
-            if hasattr(st.session_state, 'map_click_message') and st.session_state.map_click_message:
-                st.info(st.session_state.map_click_message)
-                # メッセージをクリア（一度だけ表示）
-                st.session_state.map_click_message = ""
         else:
-            st.warning("⚠️ 地図をクリックして位置を指定してください")
-
-    def _show_reset_button(self):
-        """リセットボタン表示"""
-        col1, col2, col3 = st.columns([2, 1, 2])
-        with col2:
-            if st.button("🔄 位置をリセット", type="secondary", key="reset_location_btn"):
-                # 位置情報をクリア
-                st.session_state.submission_click_lat = None
-                st.session_state.submission_click_lng = None
-                if hasattr(st.session_state, 'map_click_message'):
-                    st.session_state.map_click_message = ""
-                st.success("✅ 位置をリセットしました")
-                st.rerun()
+            st.warning("⚠️ 地図をクリックまたは位置情報を取得して位置を指定してください")
 
     def _show_form_section(self):
         """フォームセクション表示"""
@@ -208,7 +240,7 @@ class SubmissionForm:
                 st.info(
                     f"📍 登録予定位置: 緯度 {st.session_state.submission_click_lat:.6f}, 経度 {st.session_state.submission_click_lng:.6f}")
             else:
-                st.error("⚠️ まず地図上で位置を指定してください")
+                st.error("⚠️ まず地図上で位置を指定または位置情報を取得してください")
 
             # 送信ボタンと処理
             submitted = st.form_submit_button(
@@ -264,7 +296,7 @@ class SubmissionForm:
             return
 
         if not has_location:
-            st.error("❌ 地図上で位置を指定してください。")
+            st.error("❌ 地図上で位置を指定または位置情報を取得してください。")
             return
 
         # 座標の妥当性チェック
@@ -324,8 +356,6 @@ class SubmissionForm:
         st.session_state.auto_address = ""
         st.session_state.submission_click_lat = None
         st.session_state.submission_click_lng = None
-        if hasattr(st.session_state, 'map_click_message'):
-            st.session_state.map_click_message = ""
 
     def _search_address_from_zipcode(self, zipcode: str) -> str:
         """郵便番号から住所を検索（zipcloud API使用）"""
